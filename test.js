@@ -7,7 +7,6 @@ const proxy = {
   password: "7fdj6mupjzx6",
 };
 
-// Add this function to simulate human behavior
 function delay(time) {
   return new Promise(function (resolve) {
     setTimeout(resolve, time);
