@@ -20,7 +20,6 @@ const dummyUrl = {
     "/api/v4/pdp/get_pc?item_id=4420309814&shop_id=10115139&tz_offset_minutes=420&detail_level=0&",
 };
 
-// Changed from export to regular function
 async function scrapeWithBrightdata(req, res, authCookie) {
   try {
     req.originalUrl =
@@ -41,7 +40,6 @@ async function scrapeWithBrightdata(req, res, authCookie) {
       },
     });
 
-    // Only try to replace if response.data is a string
     if (typeof response.data === "string" && process.env.SCRIPT_PRELOAD) {
       response.data = response.data.replace(
         new RegExp(process.env.SCRIPT_PRELOAD, "g"),
@@ -56,5 +54,4 @@ async function scrapeWithBrightdata(req, res, authCookie) {
   }
 }
 
-// Use CommonJS export syntax
 module.exports = { scrapeWithBrightdata };

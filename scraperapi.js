@@ -8,7 +8,6 @@ async function scrapeWithScraperAPI(req, res, authCookie) {
   const SCRAPER_API_KEY = "3879265d986002abdb369dc15bd1f0fd";
   const targetUrl = `${host}/api/v4/account/basic/get_account_info`;
 
-  // Encode the target URL
   const scraperApiUrl = `http://api.scraperapi.com/?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(
     targetUrl
   )}&ultra_premium=true`;
