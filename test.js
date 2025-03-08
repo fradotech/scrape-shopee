@@ -77,6 +77,13 @@ const test = async () => {
     "thermal bottle",
   ];
 
+  page.on("response", async (response) => {
+    const status = response.status();
+    if (status >= 400) {
+      console.log(`Response error: ${status} for ${response.url()}`);
+    }
+  });
+
   const randomSearchTerm =
     searchTerms[Math.floor(Math.random() * searchTerms.length)];
 
