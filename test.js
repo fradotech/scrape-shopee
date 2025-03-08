@@ -3,8 +3,8 @@ const fs = require("fs");
 
 const proxy = {
   server: "http://brd.superproxy.io:33335",
-  username: "brd-customer-hl_155f2a69-zone-web_unlocker2",
-  password: "hztios8y76y4",
+  username: "brd-customer-hl_155f2a69-zone-web_unlocker3",
+  password: "7fdj6mupjzx6",
 };
 
 // Add this function to simulate human behavior
