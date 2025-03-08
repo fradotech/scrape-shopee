@@ -13,6 +13,9 @@
     "nodemon": "^3.1.9",
     "playright": "^0.0.22",
     "playwright": "^1.51.0",
+    "playwright-extra": "^4.3.6",
+    "playwright-extra-stealth": "^0.0.1",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "request": "^2.88.2"
   },
   "scripts": {
