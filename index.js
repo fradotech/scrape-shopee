@@ -43,9 +43,9 @@ app.get("/", async (req, res) => {
     const url = `${targetUrl}/${dummyUrl.account}`;
 
     const response = await axios.get(url, {
-      httpsAgent: residentialAgent,
+      httpsAgent: webUnlockerAgent,
       headers: {
-        "Proxy-Authorization": residentialAuthHeader,
+        "Proxy-Authorization": webUnlockerAuthHeader,
         Cookie: authCookie,
         "User-Agent":
           "Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36",
