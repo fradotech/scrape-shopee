@@ -135,7 +135,7 @@ function getHomePage(baseUrl) {
   </head>
   <body>
     <header>
-      <h1>🛍️ Shopee API Scraper by <a href="https://frado.id" style="color:white;text-decoration:none;">frado.id</a></h1>
+      <h1>🛍️ Shopee API Scraper by <a href="https://frado.id" >frado.id</a></h1>
     </header>
     
     <div class="container">
