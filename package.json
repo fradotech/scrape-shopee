@@ -21,6 +21,6 @@
   },
   "scripts": {
     "dev": "nodemon index.js",
-    "test": "nodemon test.js"
+    "start": "nodemon start.js"
   }
 }

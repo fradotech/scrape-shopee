@@ -69,16 +69,11 @@ class ScrapelessAPI {
         return this.pollTaskResult(taskId, attempt + 1);
       }
 
-      if (data.status === "completed" || data.result) {
-        console.log(`Task ${taskId} completed successfully`);
-        return data.result || data;
-      }
-
       if (data.error) {
         throw new Error(`Task failed: ${JSON.stringify(data.error)}`);
       }
 
-      throw new Error(`Unknown task state: ${JSON.stringify(data)}`);
+      return data.result || data;
     } catch (error) {
       if (error.response?.status === 404) {
         throw new Error(`Task ${taskId} not found`);
