@@ -6,13 +6,13 @@ chromium.use(StealthPlugin());
 const proxies = [
   {
     server: "http://brd.superproxy.io:33335",
-    username: "brd-customer-hl_64c8f60b-zone-web_unlocker1",
-    password: "42f2zztou1zt",
+    username: "brd-customer-hl_1242c475-zone-web_unlocker1",
+    password: "l4ml5gmir3v0",
   },
   {
     server: "http://brd.superproxy.io:33335",
-    username: "brd-customer-hl_64c8f60b-zone-web_unlocker2",
-    password: "s4d75qgb5kme",
+    username: "brd-customer-hl_1242c475-zone-web_unlocker2",
+    password: "ckoec3vy4eks",
   },
 ];
 
@@ -20,17 +20,32 @@ function getRandomProxy() {
   return proxies[Math.floor(Math.random() * proxies.length)];
 }
 
-function delay(time) {
+function delay(min, max) {
+  const time = Math.floor(min + Math.random() * (max - min));
   return new Promise(function (resolve) {
     setTimeout(resolve, time);
   });
 }
 
+// Random integer between min and max (inclusive)
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 const test = async () => {
+  const proxy = getRandomProxy();
+  console.log(`Using proxy: ${proxy.server} with username: ${proxy.username}`);
+
   const browser = await chromium.launch({
-    headless: false,
-    proxy: getRandomProxy(),
-    timeout: 600000,
+    headless: false, // Try with headless:false first to see what's happening
+    proxy: proxy,
+    timeout: 6000000,
+    args: [
+      "--disable-features=site-per-process",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins",
+      "--disable-site-isolation-trials",
+    ],
   });
 
   const userAgents = [
@@ -54,14 +69,57 @@ const test = async () => {
     "Mozilla/5.0 (Linux; Android 12; SM-G9980) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36 Line/12.11.1",
   ];
 
+  const selectedUserAgent =
+    userAgents[Math.floor(Math.random() * userAgents.length)];
+  console.log(`\nUsing user-agent: ${selectedUserAgent}`);
+
+  // Set up context with more realistic browser fingerprinting
   const context = await browser.newContext({
     ignoreHTTPSErrors: true,
-    userAgent: userAgents[Math.floor(Math.random() * userAgents.length)],
+    userAgent: selectedUserAgent,
     locale: "zh-TW",
+    timezoneId: "Asia/Taipei",
+    viewport: {
+      width: 1366 + getRandomInt(-100, 100),
+      height: 768 + getRandomInt(-50, 50),
+    },
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    javaScriptEnabled: true,
+    colorScheme: Math.random() > 0.5 ? "dark" : "light",
+    acceptDownloads: true,
+    // Add additional headers to make the request look more legitimate
+    extraHTTPHeaders: {
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "max-age=0",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
+      DNT: "1",
+    },
   });
 
-  const page = await context.newPage();
+  // Create cookie jar to handle cookies properly
+  await context.addCookies([
+    {
+      name: "SPC_SI",
+      value: getRandomInt(1000000000, 9999999999).toString(),
+      domain: ".shopee.tw",
+      path: "/",
+    },
+    {
+      name: "SPC_F",
+      value: getRandomInt(1000000000, 9999999999).toString(),
+      domain: ".shopee.tw",
+      path: "/",
+    },
+  ]);
 
+  const page = await context.newPage();
   page.setDefaultNavigationTimeout(600000);
 
   const searchTerms = [
@@ -77,72 +135,160 @@ const test = async () => {
     "thermal bottle",
   ];
 
+  // Event handlers
+  page.on("console", (msg) => console.log(`Browser console: ${msg.text()}`));
+
   page.on("response", async (response) => {
     const status = response.status();
     if (status >= 400) {
-      console.log(`Response error: ${status} for ${response.url()}`);
+      console.log(`\nResponse error: ${status} for ${response.url()}`);
     }
   });
 
-  const randomSearchTerm =
-    searchTerms[Math.floor(Math.random() * searchTerms.length)];
+  try {
+    // First visit Shopee homepage to set initial cookies
+    console.log("\nVisiting Shopee homepage...");
+    await page.goto("https://shopee.tw/", {
+      waitUntil: "domcontentloaded",
+      timeout: 600000,
+    });
 
-  await page.goto(`https://shopee.tw/search?keyword=${randomSearchTerm}`, {
-    waitUntil: "domcontentloaded",
-  });
+    await delay(3000, 6000);
 
-  /* =========== Avoid bot detection =========== */
-  // More realistic browsing behavior
-  await page.mouse.move(Math.random() * 500, Math.random() * 500, {
-    steps: 20,
-  });
-  await delay(1000 + Math.random() * 1000);
+    // Close popup if it appears
+    try {
+      const popupCloseButton = await page.$('[class*="shopee-popup-close"]');
+      if (popupCloseButton) {
+        await popupCloseButton.click();
+        await delay(1000, 2000);
+      }
+    } catch (err) {
+      console.log("No popup detected or failed to close popup");
+    }
 
-  // Realistic scrolling pattern
-  for (let i = 0; i < 3; i++) {
-    await page.mouse.wheel(0, Math.floor(100 + Math.random() * 200));
-    await delay(1000 + Math.random() * 1500);
-  }
+    // Normal browsing behavior before search
+    await simulateNormalBrowsing(page);
 
-  // Hover over some products before clicking
-  const items = await page.$$(".shopee-search-item-result__item");
-  if (items.length > 0) {
-    const randomIndexes = [
-      Math.floor(Math.random() * items.length),
-      Math.floor(Math.random() * items.length),
-    ];
+    // Now perform the search
+    const randomSearchTerm =
+      searchTerms[Math.floor(Math.random() * searchTerms.length)];
+    console.log(`Searching for: ${randomSearchTerm}`);
 
-    for (const idx of randomIndexes) {
-      await items[idx].hover();
-      await delay(1000 + Math.random() * 2000);
+    await page.goto(
+      `https://shopee.tw/search?keyword=${encodeURIComponent(
+        randomSearchTerm
+      )}`,
+      {
+        waitUntil: "domcontentloaded",
+        timeout: 600000,
+      }
+    );
+
+    await delay(5000, 8000);
+
+    // Hover over some products before clicking
+    const items = await page.$$(".shopee-search-item-result__item");
+    if (items.length > 0) {
+      const randomIndexes = [
+        Math.floor(Math.random() * items.length),
+        Math.floor(Math.random() * items.length),
+      ];
+
+      for (const idx of randomIndexes) {
+        await items[idx].hover();
+        await delay(1000 + Math.random() * 2000);
+      }
+    }
+
+    /* =========== Go to detail page =========== */
+    await page.waitForSelector(".shopee-search-item-result__item a");
+    const productLinks = await page.$$eval(
+      ".shopee-search-item-result__item a",
+      (links) => links.map((link) => link.href)
+    );
+
+    if (productLinks.length < 0) console.log("Failed find product!");
+
+    console.log(
+      "\n\nGo to detail page: ",
+      productLinks[Math.floor(Math.random() * productLinks.length)]
+    );
+
+    await page.goto(productLinks[0], { waitUntil: "networkidle" });
+    await page.waitForLoadState("networkidle");
+
+    const htmlContent = await page.content();
+
+    /* =========== Result as string =========== */
+    console.log("\n\nproduct-detail\n\n", htmlContent, "\n\n");
+    console.log("Success get detail product");
+  } catch (error) {
+    console.error(`Error during scraping: ${error.message}`);
+  } finally {
+    if (process.env.DEBUG) {
+      console.log("DEBUG mode: browser will stay open");
+      await browser.pause();
+    } else {
+      await browser.close();
     }
   }
-
-  /* =========== Go to detail page =========== */
-  await page.waitForSelector(".shopee-search-item-result__item a");
-  const productLinks = await page.$$eval(
-    ".shopee-search-item-result__item a",
-    (links) => links.map((link) => link.href)
-  );
-
-  if (productLinks.length < 0) console.log("Failed find product!");
-
-  console.log("Product links: ", productLinks);
-  console.log(
-    "Go to detail page: ",
-    productLinks[Math.floor(Math.random() * productLinks.length)]
-  );
-
-  await page.goto(productLinks[0], { waitUntil: "networkidle" });
-  await page.waitForLoadState("networkidle");
-
-  const htmlContent = await page.content();
-
-  /* =========== Result as string =========== */
-  console.log("\n\nproduct-detail\n\n", htmlContent, "\n\n");
-  console.log("Success get detail product");
-
-  await browser.pause();
 };
 
+async function simulateNormalBrowsing(page) {
+  console.log("Simulating normal browsing behavior...");
+
+  // Random mouse movements
+  for (let i = 0; i < getRandomInt(3, 6); i++) {
+    await page.mouse.move(
+      getRandomInt(0, page.viewportSize().width),
+      getRandomInt(0, page.viewportSize().height),
+      { steps: getRandomInt(10, 30) }
+    );
+    await delay(500, 1500);
+  }
+
+  // Random scrolling pattern
+  for (let i = 0; i < getRandomInt(4, 8); i++) {
+    const scrollAmount = getRandomInt(100, 500);
+    await page.mouse.wheel(0, scrollAmount);
+    await delay(1000, 3000);
+
+    // Sometimes scroll back up
+    if (Math.random() > 0.7) {
+      await page.mouse.wheel(0, -getRandomInt(50, 150));
+      await delay(800, 1500);
+    }
+  }
+}
+
+async function simulateProductPageInteraction(page) {
+  console.log("Simulating product page interaction...");
+
+  // Scroll to view product details
+  await page.evaluate(() => window.scrollBy(0, 300));
+  await delay(1000, 2000);
+
+  // Try to view product images if they exist
+  try {
+    const productImages = await page.$$('div[class*="product-image"] img');
+    if (productImages.length > 0) {
+      for (let i = 0; i < Math.min(3, productImages.length); i++) {
+        await productImages[i].hover();
+        await delay(1000, 2000);
+      }
+    }
+  } catch (e) {
+    console.log("Could not interact with product images");
+  }
+
+  // Scroll to reviews if they exist
+  await page.evaluate(() => window.scrollBy(0, 600));
+  await delay(2000, 3500);
+
+  // Scroll back up randomly
+  await page.evaluate(() => window.scrollBy(0, -200));
+  await delay(1000, 2000);
+}
+
+// Run the test
 test();
