@@ -2,9 +2,7 @@ const axios = require("axios");
 
 class ScrapelessAPI {
   constructor(apiToken, options = {}) {
-    this.apiToken =
-      apiToken ||
-      "sk_PvZaSpnIxDJ5j1TMHy0q9ea9OgwSig8p3pIeycassQwwnYDkoSSyDMMiTdeHZvFf";
+    this.apiToken = apiToken || process.env.API_KEY;
     this.baseUrl = "https://api.scrapeless.com/api/v1";
     this.client = axios.create({
       baseURL: this.baseUrl,
