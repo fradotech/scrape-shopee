@@ -11,6 +11,7 @@
     "http-proxy-middleware": "^3.0.3",
     "https-proxy-agent": "^7.0.6",
     "nodemon": "^3.1.9",
+    "p-limit": "^6.2.0",
     "playright": "^0.0.22",
     "playwright": "^1.51.0",
     "playwright-extra": "^4.3.6",
