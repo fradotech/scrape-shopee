@@ -1,176 +1,134 @@
-const https = require("https");
+const axios = require("axios");
 
-class Payload {
-  constructor(actor, input) {
-    this.actor = actor;
-    this.input = input;
+class ScrapelessAPI {
+  constructor(apiToken, options = {}) {
+    this.apiToken =
+      apiToken ||
+      "sk_PvZaSpnIxDJ5j1TMHy0q9ea9OgwSig8p3pIeycassQwwnYDkoSSyDMMiTdeHZvFf";
+    this.baseUrl = "https://api.scrapeless.com/api/v1";
+    this.client = axios.create({
+      baseURL: this.baseUrl,
+      timeout: options.timeout || 30000,
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-token": this.apiToken,
+      },
+    });
+    this.maxRetries = options.maxRetries || 10;
+    this.pollingInterval = options.pollingInterval || 3000;
+  }
+
+  async scrapeProduct(url) {
+    try {
+      const payload = {
+        actor: "scraper.shopee",
+        input: {
+          action: "shopee.product",
+          url: url,
+        },
+      };
+
+      console.log("Starting Shopee scraping task with URL:", url);
+      const response = await this.client.post("/scraper/request", payload);
+
+      if (response.data?.taskId) {
+        const result = await this.pollTaskResult(response.data.taskId);
+        return result;
+      }
+
+      return response.data;
+    } catch (error) {
+      this._handleError(error, "Failed to start scraping task");
+    }
+  }
+
+  async pollTaskResult(taskId, attempt = 1) {
+    try {
+      console.log(
+        `Checking task status [${attempt}/${this.maxRetries}] for task: ${taskId}`
+      );
+
+      const response = await this.client.get(`/scraper/result/${taskId}`);
+      const data = response.data;
+
+      if (data.state === "pending" || data.state === "processing") {
+        if (attempt >= this.maxRetries) {
+          throw new Error(
+            `Task ${taskId} timed out after ${this.maxRetries} attempts`
+          );
+        }
+
+        console.log(
+          `Task ${taskId} is ${data.state}... checking again in ${
+            this.pollingInterval / 1000
+          }s`
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.pollingInterval)
+        );
+        return this.pollTaskResult(taskId, attempt + 1);
+      }
+
+      if (data.status === "completed" || data.result) {
+        console.log(`Task ${taskId} completed successfully`);
+        return data.result || data;
+      }
+
+      if (data.error) {
+        throw new Error(`Task failed: ${JSON.stringify(data.error)}`);
+      }
+
+      throw new Error(`Unknown task state: ${JSON.stringify(data)}`);
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new Error(`Task ${taskId} not found`);
+      }
+      this._handleError(error, `Failed to check task ${taskId}`);
+    }
+  }
+
+  async getTask(taskId) {
+    try {
+      const response = await this.client.get(`/scraper/result/${taskId}`);
+      return response.data;
+    } catch (error) {
+      this._handleError(error, `Failed to get task ${taskId}`);
+    }
+  }
+
+  _handleError(error, message) {
+    console.error(error);
+    if (error.response) {
+      const errorData = error.response.data;
+      throw new Error(
+        `${message}: ${error.response.status} - ${
+          typeof errorData === "object" ? JSON.stringify(errorData) : errorData
+        }`
+      );
+    } else if (error.request) {
+      throw new Error(`${message}: No response received from server`);
+    } else {
+      throw new Error(`${message}: ${error.message}`);
+    }
   }
 }
 
 async function scrapelessRequest(expressRes, reqUrl) {
-  const host = "api.scrapeless.com";
-  const url = `https://${host}/api/v1/scraper/request`;
-  const token =
-    "sk_PvZaSpnIxDJ5j1TMHy0q9ea9OgwSig8p3pIeycassQwwnYDkoSSyDMMiTdeHZvFf";
+  const api = new ScrapelessAPI();
 
-  const inputData = {
-    action: "shopee.product",
-    url: reqUrl,
-  };
-
-  console.log("Requesting Scraper API with input data:", inputData);
-
-  const payload = new Payload("scraper.shopee", inputData);
-  const jsonPayload = JSON.stringify(payload);
-
-  const options = {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-token": token,
-    },
-  };
-
-  const req = https.request(url, options, (res) => {
-    let body = "";
-
-    res.on("data", (chunk) => {
-      body += chunk;
+  try {
+    const result = await api.scrapeProduct(reqUrl);
+    expressRes.json(result);
+  } catch (error) {
+    console.error("Error in scrapelessRequest:", error.message);
+    expressRes.status(500).json({
+      error: error.message,
+      timestamp: new Date().toISOString(),
     });
-
-    res.on("end", () => {
-      console.log("Response of first request:", body);
-
-      const response = JSON.parse(body);
-      if (response.taskId) {
-        checkTaskResult(response.taskId, token, expressRes);
-      } else {
-        console.log(
-          "============================== Result ==============================\n",
-          response
-        );
-        expressRes.send(response);
-      }
-    });
-  });
-
-  req.on("error", (error) => {
-    console.error("Error:", error);
-  });
-
-  req.write(jsonPayload);
-  req.end();
+  }
 }
 
-function checkTaskResult(taskId, token, expressRes) {
-  console.log(`Check result for taskId: ${taskId}`);
-
-  const host = "api.scrapeless.com";
-  const url = `https://${host}/api/v1/scraper/result/${taskId}`;
-
-  const options = {
-    method: "GET",
-    headers: {
-      "x-api-token": token,
-    },
-  };
-
-  const req = https.request(url, options, (res) => {
-    let body = "";
-
-    res.on("data", (chunk) => {
-      body += chunk;
-    });
-
-    res.on("end", () => {
-      try {
-        const response = JSON.parse(body);
-        console.log("Task check response:", response);
-
-        if (response.state === "pending" || response.state === "processing") {
-          console.log(
-            `Task ${taskId} is still ${response.state}... checking again in 3s`
-          );
-          setTimeout(() => checkTaskResult(taskId, token, expressRes), 3000);
-        } else if (response.status === "completed" || response.result) {
-          console.log(
-            "============================== Result ==============================\n",
-            response.result
-          );
-          expressRes.json(response.result || response);
-        } else if (response.error) {
-          console.error(`Task ${taskId} failed with error:`, response.error);
-          expressRes.status(500).json({
-            error: "Task failed",
-            taskId: taskId,
-            details: response.error,
-          });
-        } else {
-          console.error("Error or unknown task state:", response);
-          expressRes.status(500).json({
-            error: "Task failed or returned unknown state",
-            taskId: taskId,
-            details: response,
-          });
-        }
-      } catch (error) {
-        console.error("Error parsing response:", error);
-        expressRes.status(500).json({ error: "Failed to parse response" });
-      }
-    });
-  });
-
-  req.on("error", (error) => {
-    console.error("Error check task:", error);
-    expressRes.status(500).json({ error: "Failed to check task status" });
-  });
-
-  req.end();
-}
-
-// Add this function to your scrapeless.js file
-
-async function getAllTasks(expressRes) {
-  const host = "api.scrapeless.com";
-  const url = `https://${host}/api/v1/scraper/tasks`;
-  const token =
-    "sk_PvZaSpnIxDJ5j1TMHy0q9ea9OgwSig8p3pIeycassQwwnYDkoSSyDMMiTdeHZvFf";
-
-  const options = {
-    method: "GET",
-    headers: {
-      "x-api-token": token,
-    },
-  };
-
-  const req = https.request(url, options, (res) => {
-    let body = "";
-
-    res.on("data", (chunk) => {
-      body += chunk;
-    });
-
-    res.on("end", () => {
-      try {
-        const response = JSON.parse(body);
-        console.log("All tasks response:", response);
-        expressRes.json(response);
-      } catch (error) {
-        console.error("Error parsing tasks response:", error);
-        expressRes
-          .status(500)
-          .json({ error: "Failed to parse tasks response" });
-      }
-    });
-  });
-
-  req.on("error", (error) => {
-    console.error("Error getting tasks:", error);
-    expressRes.status(500).json({ error: "Failed to get tasks list" });
-  });
-
-  req.end();
-}
-
-// Don't forget to update your module exports
-module.exports = { scrapelessRequest, getAllTasks };
+module.exports = {
+  scrapelessRequest,
+  ScrapelessAPI,
+};
