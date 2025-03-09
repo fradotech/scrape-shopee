@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { ScrapelessAPI } = require("./scrapeless");
-const { products } = require("./products");
+const { getHomePage } = require("./home-page");
 
 const app = express();
 app.use(express.json());
@@ -49,35 +49,7 @@ app.get("/", (req, res) => {
   const protocol = req.protocol;
   const baseUrl = `${protocol}://${host}`;
 
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Shopee API Scraper</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body>
-      <h1>Shopee API Scraper</h1>
-      
-      <p>Convert Shopee product URLs to structured data</p>
-      
-      <h3>Endpoint: POST ${baseUrl}</h3>
-      
-      <h3>Example (curl):</h3>
-      <pre>curl --location '${baseUrl}' \\
-      --header 'Content-Type: application/json' \\
-      --data '{
-          "url": "https://shopee.tw/---i.338037348.24636536148"
-      }'</pre>
-      
-      <h3>Supported URL formats:</h3>
-      <ul>
-        <li>Product URL: https://shopee.tw/---i.{shop_id}.{item_id}</li>
-        <li>API URL: https://shopee.tw/api/v4/pdp/get_pc?item_id={item_id}&shop_id={shop_id}&tz_offset_minutes=420&detail_level=0&</li>
-      </ul>
-    </body>
-    </html>
-  `);
+  res.send(getHomePage(baseUrl));
 });
 
 app.listen(PORT, () => console.info(`Server: http://localhost:${PORT}`));
